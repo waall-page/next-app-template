@@ -1,0 +1,76 @@
+{
+  "name": "template_app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up -d && next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "test:unit": "vitest run --reporter=tree --silent",
+    "test:unit:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "admin:create": "npx tsx scripts/create-admin.ts",
+    "mail:send-test": "npx tsx scripts/send-test-email.ts",
+    "audit:ui": "bash scripts/audit-ui-complexity.sh",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "prepare": "husky"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "bcryptjs": "^3.0.3",
+    "gray-matter": "^4.0.3",
+    "marked": "^18.0.13",
+    "next": "16.1.1",
+    "next-auth": "^5.0.0-beta.30",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.17.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.16.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.4",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prisma": "^7.9.1",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^4",
+    "tsx": "^4.19.3",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true,
+    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.0": true,
+    "sharp@0.33.5": true,
+    "esbuild@0.28.2": true
+  },
+  "overrides": {
+    "nodemailer": "$nodemailer"
+  }
+}

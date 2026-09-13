@@ -1,0 +1,205 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# 連続Push時に未完了の過去ビルドを自動キャンセルしてCIリソースを節約
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# CIテスト環境用デフォルト環境変数
+env:
+  DATABASE_URL: "postgresql://postgres:password@localhost:5432/template_test_db?schema=public"
+  DIRECT_URL: "postgresql://postgres:password@localhost:5432/template_test_db?schema=public"
+  MAILPIT_API_URL: "http://localhost:8025/api/v1"
+  MAILPIT_SMTP_URL: "smtp://localhost:1025"
+  SMTP_HOST: "localhost"
+  SMTP_PORT: "1025"
+  SMTP_FROM: "Template CI <noreply@template.local>"
+  AUTH_SECRET: "test-auth-secret-for-ci-pipeline-12345"
+  AUTH_TRUST_HOST: "true"
+  APP_URL: "http://localhost:3000"
+
+jobs:
+  # 1. 静的解析 & 型チェック (高速実行・DB不要)
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Type Check
+        run: npm run type-check
+
+  # 2. 単体テスト (Postgres を使用)
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: template_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Push Database Schema
+        run: npx prisma db push
+
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+  # 3. E2E テスト (Playwright)
+  e2e-test:
+    name: E2E Tests
+    needs: [lint-and-typecheck, unit-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: template_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Playwright ブラウザのキャッシュ化 (CI速度短縮)
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      # キャッシュが無い場合のみ Chromium ブラウザと必要な依存関係をインストール
+      - name: Install Playwright Chromium & Dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Push Database Schema
+        run: npx prisma db push
+
+      - name: Seed Database
+        run: npx tsx prisma/seed.ts
+
+      - name: Build Next.js Application
+        run: npm run build
+
+      - name: Run Playwright E2E Tests
+        run: npx playwright test --project=chromium
+
+      # SRE Best Practice 4: E2E失敗時のデバッグ用にアーティファクトを自動保存
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # 4. 本番DBマイグレーション & Vercel デプロイ (全テスト合格時かつ main ブランチ push 時のみ)
+  deploy:
+    name: Deploy to Production
+    needs: e2e-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 本番データベースへマイグレーションを自動適用
+      - name: Run Production Database Migration
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      # Vercel へ本番デプロイ
+      - name: Deploy to Vercel (Production)
+        run: npx vercel@58.1.0 deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

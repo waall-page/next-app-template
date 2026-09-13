@@ -1,0 +1,8 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# 1. コミットするファイルに対してLinter（コード規約チェック）を実行
+npx lint-staged
+
+# 2. プロジェクト全体で型エラーがないかチェック
+npm run type-check

@@ -1,0 +1,67 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AccountStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  PENDING
+  EXPIRED
+  ACCEPTED
+  CANCELED
+}
+
+// ==========================================
+// 一般ユーザー
+// ==========================================
+model User {
+  id                 String        @id @default(cuid())
+  email              String        @unique
+  name               String?
+  passwordHash       String
+  status             AccountStatus @default(ACTIVE)
+  termsAgreedVersion String? // 利用規約同意バージョン
+  termsAgreedAt      DateTime? // 利用規約同意日時
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([email])
+}
+
+// ==========================================
+// 管理者（社内スタッフ）
+// ==========================================
+model Admin {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String
+  status       AccountStatus @default(ACTIVE) // 管理者アカウントの停止制御
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([email])
+}
+
+// ==========================================
+// ユーザー招待
+// ==========================================
+model UserInvitation {
+  id        String           @id @default(cuid())
+  email     String
+  token     String           @unique
+  expiresAt DateTime
+  status    InvitationStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([email])
+}
