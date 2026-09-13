@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { requireEnv } from "../../lib/env";
+import { requireEnv } from "@/lib/env";
 
 describe("lib/env.ts - requireEnv", () => {
   afterEach(() => {

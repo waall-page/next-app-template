@@ -1,4 +1,4 @@
-import { requireEnv } from "../../lib/env";
+import { requireEnv } from "@/lib/env";
 
 export interface MailpitMessage {
   ID: string;

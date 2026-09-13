@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { changeAdminPassword, adminSignOut, getAdminSessionData } from '../../../app/actions/adminAuth';
-import prisma from '../../../lib/prisma';
-import { auth, signOut } from '../../../lib/auth';
-import { verifyPassword, hashPassword } from '../../../lib/hash';
+import { changeAdminPassword, adminSignOut, getAdminSessionData } from '@/app/actions/adminAuth';
+import prisma from '@/lib/prisma';
+import { auth, signOut } from '@/lib/auth';
+import { verifyPassword, hashPassword } from '@/lib/hash';
 import { Session } from 'next-auth';
 
 // モックの設定
-vi.mock('../../../lib/auth', () => ({
+vi.mock('@/lib/auth', () => ({
     auth: vi.fn(),
     signOut: vi.fn(),
 }));
 
-vi.mock('../../../lib/hash', () => ({
+vi.mock('@/lib/hash', () => ({
     verifyPassword: vi.fn(),
     hashPassword: vi.fn(),
 }));
 
-vi.mock('../../../lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
     default: {
         admin: {
             findUnique: vi.fn(),

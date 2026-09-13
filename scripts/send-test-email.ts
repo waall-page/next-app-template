@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { sendEmail } from "../lib/email";
-import { requireEnv } from "../lib/env";
+import { sendEmail } from "@/lib/email";
+import { requireEnv } from "@/lib/env";
 
 async function main() {
   // 環境変数が正しく設定されているかを厳格に検証

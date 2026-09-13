@@ -1,5 +1,5 @@
 import NextAuth from 'next-auth';
-import { authConfig } from './lib/auth.config';
+import { authConfig } from '@/lib/auth.config';
 
 // ESM / Edge Runtime 環境で __dirname が参照された場合のエラーを防止
 declare global {

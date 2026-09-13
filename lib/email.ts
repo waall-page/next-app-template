@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { requireEnv } from "./env";
+import { requireEnv } from "@/lib/env";
 
 export interface SendEmailOptions {
   to: string;

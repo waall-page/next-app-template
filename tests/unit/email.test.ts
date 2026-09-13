@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import nodemailer from "nodemailer";
-import { sendEmail } from "../../lib/email";
+import { sendEmail } from "@/lib/email";
 
 // nodemailer のモック作成
 const mockSendMail = vi.fn();
