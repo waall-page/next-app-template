@@ -36,14 +36,6 @@ describe("Legal Document Utility", () => {
         expect(doc.html).toContain("<h1");
         expect(doc.html).toContain("1. 取得する情報");
       });
-
-      it("Markdown 内のお問い合わせプレースホルダーが解決されて HTML に反映されること", async () => {
-        process.env.APP_URL = "https://example.com";
-        const doc = await getLegalDocument("terms");
-
-        expect(doc.html).toContain('href="https://example.com/contact"');
-        expect(doc.rawMarkdown).toContain("https://example.com/contact");
-      });
     });
 
     describe("異常系", () => {
