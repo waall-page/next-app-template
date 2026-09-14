@@ -82,18 +82,19 @@ graph TD
 ログイン・認証・登録処理に関連する主要ファイルの一覧です。
 
 ### 5.1. 画面（UI）
-* **一般ログイン**: [page.tsx](../../app/(app)/login/page.tsx)
-* **一般新規登録（メール入力）**: [page.tsx](../../app/(app)/register/page.tsx)
-* **一般本登録（パスワード・規約同意）**: [page.tsx](../../app/(app)/register/page.tsx)（`token` クエリパラメータによる動的表示切り替え）
-* **退会完了画面**: [page.tsx](../../app/(app)/goodbye/page.tsx)
+* **一般ログイン**: [page.tsx](../../app/(public)/login/page.tsx)
+* **一般新規登録（メール入力）**: [page.tsx](../../app/(public)/register/page.tsx)
+* **一般本登録（パスワード・規約同意）**: [page.tsx](../../app/(public)/register/page.tsx)（`token` クエリパラメータによる動的表示切り替え）
+* **退会完了画面**: [page.tsx](../../app/(public)/deactivated/page.tsx)
 * **管理者ログイン**: [page.tsx](../../app/(admin)/admin/login/page.tsx)
 * **管理者招待管理**: [page.tsx](../../app/(admin)/admin/invitations/page.tsx)
 
 ### 5.2. サーバーアクション（Server Actions）
 * **一般ユーザー認証・登録**: [auth.ts](../../app/actions/auth.ts)
   * `authenticate`: 一般ログイン
-  * `requestRegistrationEmail`: 自由登録の確認メール送信
-  * `registerUserViaInvitation`: 本登録（パスワード設定・規約同意、招待制と共通）
+  * `requestRegistrationEmailAction`: 自由登録の確認メール送信
+  * `registerUserAction`: 本登録（パスワード設定・規約同意、招待制と共通）
+  * `userSignOut`: 一般ログアウト（トップ `/` へリダイレクト）
 * **管理者認証**: [adminAuth.ts](../../app/actions/adminAuth.ts)
   * `authenticateAdmin`: 管理者ログイン（NextAuthに `{ role: 'admin' }` を付与）
   * `changeAdminPassword`: 管理者パスワード変更

@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { isPublicRegistrationEnabled } from "@/lib/env";
 
 export default function HomePage() {
+  const showRegister = isPublicRegistrationEnabled();
+
   return (
     <div className="relative overflow-hidden py-16 sm:py-24">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -13,8 +16,8 @@ export default function HomePage() {
             Next.js App Template
           </h1>
           <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-600">
-            管理者・一般ユーザーの認証（NextAuth v5）、招待制登録ワークフロー、
-            PostgreSQL + Prisma、Docker Mailpit を完備したテンプレートです。
+            管理者・一般ユーザーの二系統認証（NextAuth v5）、確認メール先行型ユーザー登録、
+            PostgreSQL + Prisma、Docker Mailpit を完備したフルスタックテンプレートです。
           </p>
           <div className="pt-4 flex flex-wrap justify-center gap-4">
             <Link
@@ -23,6 +26,14 @@ export default function HomePage() {
             >
               ユーザーログイン
             </Link>
+            {showRegister && (
+              <Link
+                href="/register"
+                className="px-6 py-3 text-base font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl shadow-sm hover:bg-blue-100 transition-all"
+              >
+                新規会員登録
+              </Link>
+            )}
             <Link
               href="/admin/login"
               className="px-6 py-3 text-base font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl shadow-sm hover:bg-slate-50 transition-all"
@@ -48,9 +59,9 @@ export default function HomePage() {
             <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
               ✉️
             </div>
-            <h2 className="text-lg font-bold text-slate-900">招待制ユーザー登録</h2>
+            <h2 className="text-lg font-bold text-slate-900">モダンなユーザー登録</h2>
             <p className="text-sm text-slate-600">
-              管理者が招待メールを発行し、セキュアなワンタイムトークンを用いてユーザーが規約同意・パスワード設定を経て登録完了。
+              確認メール先行型による安全なメール所有確認。自由登録制と招待制で本登録フロー（パスワード設定・規約同意）を共通化。
             </p>
           </div>
 

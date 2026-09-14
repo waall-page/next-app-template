@@ -15,3 +15,20 @@ export function requireEnv(key: string): string {
   }
   return value;
 }
+
+/**
+ * 自由登録（一般ユーザー登録）が有効かどうかを取得します。
+ * デフォルト: true（ENABLE_PUBLIC_REGISTRATION="false" の場合のみ無効）
+ */
+export function isPublicRegistrationEnabled(): boolean {
+  return process.env.ENABLE_PUBLIC_REGISTRATION !== "false";
+}
+
+/**
+ * 招待制機能が有効かどうかを取得します。
+ * デフォルト: false（ENABLE_INVITATION="true" の場合のみ有効）
+ */
+export function isInvitationEnabled(): boolean {
+  return process.env.ENABLE_INVITATION === "true";
+}
+
