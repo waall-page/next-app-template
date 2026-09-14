@@ -16,9 +16,13 @@ const initialActionState: InvitationActionResponse = {
 
 interface InvitationClientProps {
     initialInvitations: InvitationItem[];
+    isInvitationEnabled: boolean;
 }
 
-export default function InvitationClient({ initialInvitations }: InvitationClientProps) {
+export default function InvitationClient({
+    initialInvitations,
+    isInvitationEnabled,
+}: InvitationClientProps) {
     const [state, formAction, isPending] = useActionState(inviteUserAction, initialActionState);
     const [isTransitionPending, startTransition] = useTransition();
 
@@ -54,6 +58,19 @@ export default function InvitationClient({ initialInvitations }: InvitationClien
                 </p>
             </div>
 
+            {/* Mode Banner when invitation is disabled */}
+            {!isInvitationEnabled && (
+                <div className="p-4 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-300 text-sm flex items-start gap-3 shadow-sm">
+                    <span className="text-amber-400 font-bold">ℹ️</span>
+                    <div>
+                        <p className="font-semibold text-white">自由登録制（Public Registration）モードで稼働中</p>
+                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                            現在、一般ビジター自身が新規登録（/register）できる自由登録制で稼働しているため、管理者からの個別招待メール発行は停止しています。招待制に切り替えるには環境変数 <code className="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300">REGISTRATION_MODE=&quot;invitation&quot;</code> を設定してください。
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Invite Form Card */}
             <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-4">新規ユーザーを招待</h2>
@@ -75,12 +92,17 @@ export default function InvitationClient({ initialInvitations }: InvitationClien
                         type="email"
                         name="email"
                         required
-                        placeholder="招待するユーザーのメールアドレス (例: user@example.com)"
-                        className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        disabled={!isInvitationEnabled || isPending}
+                        placeholder={
+                            isInvitationEnabled
+                                ? '招待するユーザーのメールアドレス (例: user@example.com)'
+                                : '招待機能は無効化されています'
+                        }
+                        className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button
                         type="submit"
-                        disabled={isPending}
+                        disabled={!isInvitationEnabled || isPending}
                         className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap shadow-md"
                     >
                         {isPending ? (

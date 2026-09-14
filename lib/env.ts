@@ -16,19 +16,40 @@ export function requireEnv(key: string): string {
   return value;
 }
 
+export type RegistrationMode = "public" | "invitation" | "disabled";
+
+/**
+ * システムのユーザー登録モードを取得します（排他2者択一設定）。
+ * - "public": 自由登録制（確認メール先行型、デフォルト）
+ * - "invitation": 招待制（管理者招待のみ）
+ * - "disabled": 新規受付停止
+ */
+export function getRegistrationMode(): RegistrationMode {
+  const mode = process.env.REGISTRATION_MODE || process.env.AUTH_REGISTRATION_MODE;
+  if (mode === "invitation") return "invitation";
+  if (mode === "disabled") return "disabled";
+  if (mode === "public") return "public";
+
+  // 後方互換性チェック
+  if (process.env.ENABLE_INVITATION === "true" && process.env.ENABLE_PUBLIC_REGISTRATION === "false") {
+    return "invitation";
+  }
+
+  return "public";
+}
+
 /**
  * 自由登録（一般ユーザー登録）が有効かどうかを取得します。
- * デフォルト: true（ENABLE_PUBLIC_REGISTRATION="false" の場合のみ無効）
  */
 export function isPublicRegistrationEnabled(): boolean {
-  return process.env.ENABLE_PUBLIC_REGISTRATION !== "false";
+  return getRegistrationMode() === "public";
 }
 
 /**
  * 招待制機能が有効かどうかを取得します。
- * デフォルト: false（ENABLE_INVITATION="true" の場合のみ有効）
  */
 export function isInvitationEnabled(): boolean {
-  return process.env.ENABLE_INVITATION === "true";
+  return getRegistrationMode() === "invitation";
 }
+
 

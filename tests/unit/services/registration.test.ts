@@ -2,15 +2,19 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { hashPassword } from "@/lib/hash";
-
-// 今後実装予定の登録サービス関数の型定義・モック呼び出し準備 (TDD)
+import { sendEmail } from "@/lib/email";
 import {
   verifyInvitationToken,
   registerUserViaInvitation,
+  requestPublicRegistration,
 } from "@/lib/services/registration";
 import { getLatestTermsVersion } from "@/lib/legal";
 
-describe("User Registration via Invitation Service", () => {
+vi.mock("@/lib/email", () => ({
+  sendEmail: vi.fn(),
+}));
+
+describe("User Registration Service", () => {
   const testEmail = "invitee-registration@example.com";
   const validPassword = "SecurePassword123!";
 
@@ -42,17 +46,21 @@ describe("User Registration via Invitation Service", () => {
         const result = await verifyInvitationToken(token);
 
         expect(result.valid).toBe(true);
-        expect(result.invitation?.email).toBe(testEmail);
-        expect(result.invitation?.id).toBe(invitation.id);
+        if (result.valid) {
+          expect(result.invitation.email).toBe(testEmail);
+          expect(result.invitation.id).toBe(invitation.id);
+        }
       });
     });
 
     describe("異常系", () => {
-      it("存在しないトークンの場合は invalid: true と適切なエラーメッセージを返すこと", async () => {
+      it("存在しないトークンの場合は valid: false と適切なエラーメッセージを返すこと", async () => {
         const result = await verifyInvitationToken("non-existent-token");
 
         expect(result.valid).toBe(false);
-        expect(result.message).toBe("招待リンクが無効または存在しません。");
+        if (!result.valid) {
+          expect(result.error).toBe("招待リンクが無効または存在しません。");
+        }
       });
 
       it("有効期限切れ（expiresAtが過去）のトークンの場合はエラーを返すこと", async () => {
@@ -72,7 +80,9 @@ describe("User Registration via Invitation Service", () => {
         const result = await verifyInvitationToken(token);
 
         expect(result.valid).toBe(false);
-        expect(result.message).toBe("招待リンクの有効期限が切れています。");
+        if (!result.valid) {
+          expect(result.error).toBe("招待リンクの有効期限が切れています。");
+        }
       });
 
       it("取り消し済み (CANCELED) のトークンの場合はエラーを返すこと", async () => {
@@ -92,7 +102,9 @@ describe("User Registration via Invitation Service", () => {
         const result = await verifyInvitationToken(token);
 
         expect(result.valid).toBe(false);
-        expect(result.message).toBe("この招待は取り消されています。");
+        if (!result.valid) {
+          expect(result.error).toBe("この招待は取り消されています。");
+        }
       });
 
       it("使用済み (ACCEPTED) のトークンの場合はエラーを返すこと", async () => {
@@ -112,7 +124,9 @@ describe("User Registration via Invitation Service", () => {
         const result = await verifyInvitationToken(token);
 
         expect(result.valid).toBe(false);
-        expect(result.message).toBe("この招待リンクは既に登録手続きに使用されています。");
+        if (!result.valid) {
+          expect(result.error).toBe("この招待リンクは既に登録手続きに使用されています。");
+        }
       });
     });
   });
@@ -140,9 +154,10 @@ describe("User Registration via Invitation Service", () => {
         });
 
         expect(result.success).toBe(true);
-        expect(result.user).toBeDefined();
-        expect(result.user?.email).toBe(testEmail);
-        expect(result.user?.status).toBe("ACTIVE");
+        if (result.success) {
+          expect(result.user.email).toBe(testEmail);
+          expect(result.user.status).toBe("ACTIVE");
+        }
 
         // 1. DB上にUserが作成されているか検証
         const createdUser = await prisma.user.findUnique({
@@ -190,7 +205,9 @@ describe("User Registration via Invitation Service", () => {
         });
 
         expect(result.success).toBe(false);
-        expect(result.message).toBe("利用規約およびプライバシーポリシーへの同意が必要です。");
+        if (!result.success) {
+          expect(result.error).toBe("利用規約およびプライバシーポリシーへの同意が必要です。");
+        }
 
         // Userが作成されていないことを検証 (セキュリティアサーション)
         const userCount = await prisma.user.count({ where: { email: testEmail } });
@@ -218,7 +235,9 @@ describe("User Registration via Invitation Service", () => {
         });
 
         expect(result.success).toBe(false);
-        expect(result.message).toContain("パスワードは8文字以上");
+        if (!result.success) {
+          expect(result.error).toContain("パスワードは8文字以上");
+        }
 
         // Userが作成されていないことを検証 (セキュリティアサーション)
         const userCount = await prisma.user.count({ where: { email: testEmail } });
@@ -246,7 +265,9 @@ describe("User Registration via Invitation Service", () => {
         });
 
         expect(result.success).toBe(false);
-        expect(result.message).toBe("招待リンクの有効期限が切れています。");
+        if (!result.success) {
+          expect(result.error).toBe("招待リンクの有効期限が切れています。");
+        }
 
         // DBにユーザーが作成されていないこと
         const createdUser = await prisma.user.findUnique({
@@ -285,8 +306,112 @@ describe("User Registration via Invitation Service", () => {
         });
 
         expect(result.success).toBe(false);
-        expect(result.message).toBe("このメールアドレスは既に登録されています。");
+        if (!result.success) {
+          expect(result.error).toBe("このメールアドレスは既に登録されています。");
+        }
+      });
+    });
+  });
+
+  describe("requestPublicRegistration", () => {
+    describe("正常系", () => {
+      it("有効な未登録メールアドレスの場合、トークンを発行してDBにPENDING保存し確認メールを送信すること", async () => {
+        const result = await requestPublicRegistration(testEmail);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.message).toContain("確認メールを送信しました");
+        }
+
+        // 1. DBにPENDING状態のUserInvitationが作成されているか検証
+        const invitation = await prisma.userInvitation.findFirst({
+          where: { email: testEmail, status: "PENDING" },
+        });
+        expect(invitation).not.toBeNull();
+        expect(invitation?.token).toBeDefined();
+        expect(invitation?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+
+        // 2. メール送信サービスが正しいリンクURLを含んで呼ばれたか検証
+        expect(sendEmail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            to: testEmail,
+            subject: "【Template】アカウント登録のご案内",
+            text: expect.stringContaining(`/register?token=${invitation?.token}`),
+            html: expect.stringContaining(`/register?token=${invitation?.token}`),
+          })
+        );
+      });
+
+      it("既にPENDING状態の招待レコードが存在する場合、新しいトークンと有効期限で更新してメールを再送すること", async () => {
+        const oldToken = crypto.randomUUID();
+        const oldExpiresAt = new Date();
+        oldExpiresAt.setHours(oldExpiresAt.getHours() + 1);
+
+        await prisma.userInvitation.create({
+          data: {
+            email: testEmail,
+            token: oldToken,
+            expiresAt: oldExpiresAt,
+            status: "PENDING",
+          },
+        });
+
+        const result = await requestPublicRegistration(testEmail);
+
+        expect(result.success).toBe(true);
+
+        const invitations = await prisma.userInvitation.findMany({
+          where: { email: testEmail },
+        });
+        expect(invitations.length).toBe(1);
+        expect(invitations[0].token).not.toBe(oldToken);
+        expect(invitations[0].expiresAt.getTime()).toBeGreaterThan(oldExpiresAt.getTime());
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+      });
+
+      it("既に登録済みのユーザーが存在する場合、列挙防止のためメール送信を行わずに成功メッセージを返すこと", async () => {
+        await prisma.user.create({
+          data: {
+            email: testEmail,
+            passwordHash: await hashPassword(validPassword),
+            status: "ACTIVE",
+          },
+        });
+
+        const result = await requestPublicRegistration(testEmail);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.message).toContain("確認メールを送信しました");
+        }
+
+        // メール送信もトークン作成も行われないこと
+        expect(sendEmail).not.toHaveBeenCalled();
+        const invitationCount = await prisma.userInvitation.count({
+          where: { email: testEmail },
+        });
+        expect(invitationCount).toBe(0);
+      });
+    });
+
+    describe("異常系", () => {
+      it("メールアドレスが無効（空文字または@なし）の場合はエラーを返し、処理を中断すること", async () => {
+        const resultEmpty = await requestPublicRegistration("");
+        expect(resultEmpty.success).toBe(false);
+        if (!resultEmpty.success) {
+          expect(resultEmpty.error).toBe("有効なメールアドレスを入力してください。");
+        }
+
+        const resultNoAt = await requestPublicRegistration("invalid-email");
+        expect(resultNoAt.success).toBe(false);
+        if (!resultNoAt.success) {
+          expect(resultNoAt.error).toBe("有効なメールアドレスを入力してください。");
+        }
+
+        expect(sendEmail).not.toHaveBeenCalled();
       });
     });
   });
 });
+

@@ -12,11 +12,16 @@ import {
     resendInvitation,
     cancelInvitation,
 } from '@/lib/services/invitation';
+import { isInvitationEnabled } from '@/lib/env';
 import { revalidatePath } from 'next/cache';
 import { Session } from 'next-auth';
 
 vi.mock('@/lib/auth', () => ({
     auth: vi.fn(),
+}));
+
+vi.mock('@/lib/env', () => ({
+    isInvitationEnabled: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('@/lib/services/invitation', () => ({
@@ -40,6 +45,7 @@ vi.mock('next/cache', () => ({
 describe('invitation Server Actions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(isInvitationEnabled).mockReturnValue(true);
     });
 
     describe('inviteUserAction', () => {
@@ -124,6 +130,21 @@ describe('invitation Server Actions', () => {
                 expect(inviteUser).not.toHaveBeenCalled();
             });
 
+            it('招待機能が無効に設定されている場合はエラーを返すこと', async () => {
+                vi.mocked(isInvitationEnabled).mockReturnValue(false);
+
+                const formData = new FormData();
+                formData.set('email', 'user@example.com');
+
+                const result = await inviteUserAction(null, formData);
+
+                expect(result.success).toBe(false);
+                if (!result.success) {
+                    expect(result.error).toContain('招待機能は無効に設定されています');
+                }
+                expect(inviteUser).not.toHaveBeenCalled();
+            });
+
             it('サービス層で招待送信に失敗した場合はそのエラーメッセージを返すこと', async () => {
                 vi.mocked(auth as () => Promise<Session | null>).mockResolvedValue({
                     user: { id: 'admin-1', role: 'admin' },
@@ -131,7 +152,7 @@ describe('invitation Server Actions', () => {
 
                 vi.mocked(inviteUser).mockResolvedValue({
                     success: false,
-                    message: 'このメールアドレスは既に登録されています。',
+                    error: 'このメールアドレスは既に登録されています。',
                 });
 
                 const formData = new FormData();
@@ -157,6 +178,12 @@ describe('invitation Server Actions', () => {
                 vi.mocked(resendInvitation).mockResolvedValue({
                     success: true,
                     message: '招待メールを再送信しました。',
+                    invitation: {
+                        id: 'inv-1',
+                        email: 'user@example.com',
+                        token: 'tok-1',
+                        expiresAt: new Date(),
+                    },
                 });
 
                 const result = await resendInvitationAction('inv-1');
@@ -171,6 +198,18 @@ describe('invitation Server Actions', () => {
         });
 
         describe('異常系', () => {
+            it('招待機能が無効に設定されている場合はエラーを返すこと', async () => {
+                vi.mocked(isInvitationEnabled).mockReturnValue(false);
+
+                const result = await resendInvitationAction('inv-1');
+
+                expect(result.success).toBe(false);
+                if (!result.success) {
+                    expect(result.error).toBe('現在、招待機能は無効に設定されています。');
+                }
+                expect(resendInvitation).not.toHaveBeenCalled();
+            });
+
             it('非管理者が再送信を試みた場合は権限エラーを返すこと', async () => {
                 vi.mocked(auth as () => Promise<Session | null>).mockResolvedValue({
                     user: { id: 'user-1', role: 'user' },
@@ -192,7 +231,7 @@ describe('invitation Server Actions', () => {
 
                 vi.mocked(resendInvitation).mockResolvedValue({
                     success: false,
-                    message: '招待が見つかりません。',
+                    error: '招待が見つかりません。',
                 });
 
                 const result = await resendInvitationAction('inv-invalid');
@@ -250,7 +289,7 @@ describe('invitation Server Actions', () => {
 
                 vi.mocked(cancelInvitation).mockResolvedValue({
                     success: false,
-                    message: '招待が見つかりません。',
+                    error: '招待が見つかりません。',
                 });
 
                 const result = await cancelInvitationAction('inv-invalid');

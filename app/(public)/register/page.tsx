@@ -53,7 +53,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
     // 2. トークンが存在する場合: トークン検証 ➔ パスワード設定・規約同意の本登録フロー
     const verifyResult = await verifyInvitationToken(token);
 
-    if (!verifyResult.valid || !verifyResult.invitation) {
+    if (!verifyResult.valid) {
         return (
             <div className="min-h-[80vh] flex flex-col justify-center items-center px-4 py-12">
                 <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-md text-center space-y-6">
@@ -64,7 +64,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
                         登録リンクが無効です
                     </h1>
                     <p className="text-sm text-slate-600 leading-relaxed">
-                        {verifyResult.message || '登録用リンクの有効期限が切れているか、既に使用済み・取り消しされています。'}
+                        {verifyResult.error}
                     </p>
                     <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
                         <Link

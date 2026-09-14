@@ -3,16 +3,31 @@ import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/url";
 
-export interface InviteUserResult {
-  success: boolean;
-  message?: string;
-  invitation?: {
-    id: string;
-    email: string;
-    token: string;
-    expiresAt: Date;
-  };
-}
+export type InviteUserResult =
+  | {
+      success: true;
+      message: string;
+      invitation: {
+        id: string;
+        email: string;
+        token: string;
+        expiresAt: Date;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+export type CancelInvitationResult =
+  | {
+      success: true;
+      message: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 /**
  * ユーザー招待の有効期限 (24時間)
@@ -26,7 +41,7 @@ export async function inviteUser(email: string): Promise<InviteUserResult> {
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
-    return { success: false, message: "有効なメールアドレスを入力してください。" };
+    return { success: false, error: "有効なメールアドレスを入力してください。" };
   }
 
   // 1. 既存ユーザーチェック
@@ -35,7 +50,7 @@ export async function inviteUser(email: string): Promise<InviteUserResult> {
   });
 
   if (existingUser) {
-    return { success: false, message: "指定されたメールアドレスは既に登録されています。" };
+    return { success: false, error: "指定されたメールアドレスは既に登録されています。" };
   }
 
   // 2. 既に有効なPENDING状態の招待が存在するかチェック
@@ -50,7 +65,7 @@ export async function inviteUser(email: string): Promise<InviteUserResult> {
   if (existingPendingInvitation) {
     return {
       success: false,
-      message: "指定されたメールアドレス宛に既に有効な招待が送信されています。",
+      error: "指定されたメールアドレス宛に既に有効な招待が送信されています。",
     };
   }
 
@@ -71,7 +86,7 @@ export async function inviteUser(email: string): Promise<InviteUserResult> {
 
   // 5. 招待メールの送信
   const baseUrl = getBaseUrl();
-  const inviteUrl = `${baseUrl}/invite/setup?token=${token}`;
+  const inviteUrl = `${baseUrl}/register?token=${token}`;
 
   await sendEmail({
     to: normalizedEmail,
@@ -124,7 +139,7 @@ export async function resendInvitation(invitationId: string): Promise<InviteUser
   });
 
   if (!invitation || invitation.status !== "PENDING") {
-    return { success: false, message: "再送信可能な招待が見つかりません。" };
+    return { success: false, error: "再送信可能な招待が見つかりません。" };
   }
 
   // 有効期限を現在から24時間後に更新
@@ -137,7 +152,7 @@ export async function resendInvitation(invitationId: string): Promise<InviteUser
   });
 
   const baseUrl = getBaseUrl();
-  const inviteUrl = `${baseUrl}/invite/setup?token=${updatedInvitation.token}`;
+  const inviteUrl = `${baseUrl}/register?token=${updatedInvitation.token}`;
 
   await sendEmail({
     to: updatedInvitation.email,
@@ -182,13 +197,13 @@ Template への招待の案内を再送いたします。
 /**
  * 招待の取り消し
  */
-export async function cancelInvitation(invitationId: string): Promise<{ success: boolean; message: string }> {
+export async function cancelInvitation(invitationId: string): Promise<CancelInvitationResult> {
   const invitation = await prisma.userInvitation.findUnique({
     where: { id: invitationId },
   });
 
   if (!invitation) {
-    return { success: false, message: "対象の招待が見つかりません。" };
+    return { success: false, error: "対象の招待が見つかりません。" };
   }
 
   await prisma.userInvitation.update({

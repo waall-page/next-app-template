@@ -1,12 +1,12 @@
 'use server';
 
-import prisma from '@/lib/prisma';
-import crypto from 'crypto';
 import { signIn, signOut } from '@/lib/auth';
 import { AuthError } from 'next-auth';
-import { sendEmail } from '@/lib/email';
 import { isPublicRegistrationEnabled } from '@/lib/env';
-import { registerUserViaInvitation } from '@/lib/services/registration';
+import {
+    registerUserViaInvitation,
+    requestPublicRegistration,
+} from '@/lib/services/registration';
 
 export interface AuthActionState {
     error: string | null;
@@ -109,57 +109,18 @@ export async function requestRegistrationEmailAction(
         };
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const result = await requestPublicRegistration(email.trim());
 
-    // 既存アカウントの確認 (アカウント列挙攻撃対策: 画面表示は同一の成功を返す)
-    const existingUser = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
-    });
-
-    if (existingUser) {
+    if (!result.success) {
         return {
-            success: true,
-            message: '確認メールを送信しました。メールに記載されたリンクから登録を完了してください。',
+            success: false,
+            error: result.error,
         };
     }
 
-    const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    const existingInvitation = await prisma.userInvitation.findFirst({
-        where: { email: normalizedEmail, status: 'PENDING' },
-    });
-
-    if (existingInvitation) {
-        await prisma.userInvitation.update({
-            where: { id: existingInvitation.id },
-            data: { token, expiresAt },
-        });
-    } else {
-        await prisma.userInvitation.create({
-            data: {
-                email: normalizedEmail,
-                token,
-                expiresAt,
-                status: 'PENDING',
-            },
-        });
-    }
-
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    const registrationUrl = `${appUrl}/register?token=${token}`;
-
-    await sendEmail({
-        to: normalizedEmail,
-        subject: '【Template】アカウント登録のご案内',
-        text: `サービスへの登録ありがとうございます。\n\n以下のリンクをクリックして、パスワードの設定および利用規約への同意を行ってアカウント登録を完了してください。\n\n${registrationUrl}\n\n※このリンクの有効期限は24時間です。`,
-        html: `<p>サービスへの登録ありがとうございます。</p><p>以下のリンクをクリックして、パスワードの設定および利用規約への同意を行ってアカウント登録を完了してください。</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p><small>※このリンクの有効期限は24時間です。</small></p>`,
-    });
-
     return {
         success: true,
-        message: '確認メールを送信しました。メールに記載されたリンクから登録を完了してください。',
+        message: result.message,
     };
 }
 
@@ -212,7 +173,7 @@ export async function registerUserAction(
     if (!result.success) {
         return {
             success: false,
-            error: result.message ?? 'アカウント登録に失敗しました。',
+            error: result.error,
         };
     }
 

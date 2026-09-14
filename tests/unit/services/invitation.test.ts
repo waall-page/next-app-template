@@ -26,9 +26,10 @@ describe("User Invitation Service", () => {
         const result = await inviteUser(testEmail);
 
         expect(result.success).toBe(true);
-        expect(result.invitation).toBeDefined();
-        expect(result.invitation?.email).toBe(testEmail);
-        expect(result.invitation?.token).toBeDefined();
+        if (!result.success) throw new Error("Expected inviteUser to succeed");
+
+        expect(result.invitation.email).toBe(testEmail);
+        expect(result.invitation.token).toBeDefined();
 
         // sendEmail が正しい宛先と内容で呼び出されたことを検証
         expect(sendEmail).toHaveBeenCalledTimes(1);
@@ -36,14 +37,14 @@ describe("User Invitation Service", () => {
           expect.objectContaining({
             to: testEmail,
             subject: "【Template】アカウント招待のご案内",
-            text: expect.stringContaining(`http://test.local/invite/setup?token=${result.invitation!.token}`),
-            html: expect.stringContaining(`http://test.local/invite/setup?token=${result.invitation!.token}`),
+            text: expect.stringContaining(`http://test.local/register?token=${result.invitation.token}`),
+            html: expect.stringContaining(`http://test.local/register?token=${result.invitation.token}`),
           })
         );
 
         // DB状態の確認
         const invitation = await prisma.userInvitation.findUnique({
-          where: { token: result.invitation!.token },
+          where: { token: result.invitation.token },
         });
         expect(invitation).not.toBeNull();
         expect(invitation?.status).toBe("PENDING");
@@ -55,7 +56,9 @@ describe("User Invitation Service", () => {
         const result = await inviteUser("invalid-email");
 
         expect(result.success).toBe(false);
-        expect(result.message).toContain("有効なメールアドレス");
+        if (!result.success) {
+          expect(result.error).toContain("有効なメールアドレス");
+        }
         expect(sendEmail).not.toHaveBeenCalled();
       });
 
@@ -71,7 +74,9 @@ describe("User Invitation Service", () => {
         const result = await inviteUser(testEmail);
 
         expect(result.success).toBe(false);
-        expect(result.message).toBe("指定されたメールアドレスは既に登録されています。");
+        if (!result.success) {
+          expect(result.error).toBe("指定されたメールアドレスは既に登録されています。");
+        }
         expect(sendEmail).not.toHaveBeenCalled();
       });
 
@@ -82,7 +87,9 @@ describe("User Invitation Service", () => {
         const result = await inviteUser(testEmail);
 
         expect(result.success).toBe(false);
-        expect(result.message).toBe("指定されたメールアドレス宛に既に有効な招待が送信されています。");
+        if (!result.success) {
+          expect(result.error).toBe("指定されたメールアドレス宛に既に有効な招待が送信されています。");
+        }
         expect(sendEmail).not.toHaveBeenCalled();
       });
     });
@@ -92,7 +99,8 @@ describe("User Invitation Service", () => {
     describe("正常系", () => {
       it("PENDING状態の招待の有効期限を更新して再送信できること", async () => {
         const initial = await inviteUser(testEmail);
-        const invitationId = initial.invitation!.id;
+        if (!initial.success) throw new Error("Expected initial inviteUser to succeed");
+        const invitationId = initial.invitation.id;
         vi.mocked(sendEmail).mockClear();
 
         // 1秒待つ代わりに、既存招待データの expiresAt を1秒前に設定
@@ -104,7 +112,9 @@ describe("User Invitation Service", () => {
         const resendResult = await resendInvitation(invitationId);
 
         expect(resendResult.success).toBe(true);
-        expect(resendResult.invitation?.expiresAt.getTime()).toBeGreaterThan(
+        if (!resendResult.success) throw new Error("Expected resendInvitation to succeed");
+
+        expect(resendResult.invitation.expiresAt.getTime()).toBeGreaterThan(
           updatedInitial.expiresAt.getTime()
         );
 
@@ -114,8 +124,8 @@ describe("User Invitation Service", () => {
           expect.objectContaining({
             to: testEmail,
             subject: "【再送】【Template】アカウント招待のご案内",
-            text: expect.stringContaining(`http://test.local/invite/setup?token=${initial.invitation!.token}`),
-            html: expect.stringContaining(`http://test.local/invite/setup?token=${initial.invitation!.token}`),
+            text: expect.stringContaining(`http://test.local/register?token=${initial.invitation.token}`),
+            html: expect.stringContaining(`http://test.local/register?token=${initial.invitation.token}`),
           })
         );
       });
@@ -126,7 +136,8 @@ describe("User Invitation Service", () => {
     describe("正常系", () => {
       it("招待を取り消すことができること (status: CANCELED)", async () => {
         const initial = await inviteUser(testEmail);
-        const invitationId = initial.invitation!.id;
+        if (!initial.success) throw new Error("Expected initial inviteUser to succeed");
+        const invitationId = initial.invitation.id;
         vi.mocked(sendEmail).mockClear();
 
         const cancelResult = await cancelInvitation(invitationId);

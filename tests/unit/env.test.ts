@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { requireEnv } from "@/lib/env";
+import {
+  requireEnv,
+  getRegistrationMode,
+  isPublicRegistrationEnabled,
+  isInvitationEnabled,
+} from "@/lib/env";
 
 describe("lib/env.ts - requireEnv", () => {
   afterEach(() => {
@@ -34,3 +39,49 @@ describe("lib/env.ts - requireEnv", () => {
     });
   });
 });
+
+describe("lib/env.ts - Registration Mode Helpers", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describe("getRegistrationMode & mode helpers", () => {
+    it("未設定の場合はデフォルトで public モードになること", () => {
+      delete process.env.REGISTRATION_MODE;
+      delete process.env.AUTH_REGISTRATION_MODE;
+      delete process.env.ENABLE_INVITATION;
+      delete process.env.ENABLE_PUBLIC_REGISTRATION;
+
+      expect(getRegistrationMode()).toBe("public");
+      expect(isPublicRegistrationEnabled()).toBe(true);
+      expect(isInvitationEnabled()).toBe(false);
+    });
+
+    it("REGISTRATION_MODE=invitation の場合は招待制モードになること", () => {
+      vi.stubEnv("REGISTRATION_MODE", "invitation");
+
+      expect(getRegistrationMode()).toBe("invitation");
+      expect(isPublicRegistrationEnabled()).toBe(false);
+      expect(isInvitationEnabled()).toBe(true);
+    });
+
+    it("REGISTRATION_MODE=disabled の場合は受付停止モードになること", () => {
+      vi.stubEnv("REGISTRATION_MODE", "disabled");
+
+      expect(getRegistrationMode()).toBe("disabled");
+      expect(isPublicRegistrationEnabled()).toBe(false);
+      expect(isInvitationEnabled()).toBe(false);
+    });
+
+    it("後方互換性: ENABLE_INVITATION=true かつ ENABLE_PUBLIC_REGISTRATION=false の場合は invitation モードになること", () => {
+      delete process.env.REGISTRATION_MODE;
+      vi.stubEnv("ENABLE_INVITATION", "true");
+      vi.stubEnv("ENABLE_PUBLIC_REGISTRATION", "false");
+
+      expect(getRegistrationMode()).toBe("invitation");
+      expect(isPublicRegistrationEnabled()).toBe(false);
+      expect(isInvitationEnabled()).toBe(true);
+    });
+  });
+});
+

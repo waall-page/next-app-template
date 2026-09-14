@@ -9,18 +9,15 @@ import {
 } from '@/app/actions/auth';
 import { signIn, signOut } from '@/lib/auth';
 import { AuthError } from 'next-auth';
-import prisma from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
 import { isPublicRegistrationEnabled } from '@/lib/env';
-import { registerUserViaInvitation } from '@/lib/services/registration';
+import {
+    registerUserViaInvitation,
+    requestPublicRegistration,
+} from '@/lib/services/registration';
 
 vi.mock('@/lib/auth', () => ({
     signIn: vi.fn(),
     signOut: vi.fn(),
-}));
-
-vi.mock('@/lib/email', () => ({
-    sendEmail: vi.fn().mockResolvedValue({ messageId: 'mock-msg-id' }),
 }));
 
 vi.mock('@/lib/env', () => ({
@@ -29,19 +26,7 @@ vi.mock('@/lib/env', () => ({
 
 vi.mock('@/lib/services/registration', () => ({
     registerUserViaInvitation: vi.fn(),
-}));
-
-vi.mock('@/lib/prisma', () => ({
-    default: {
-        user: {
-            findUnique: vi.fn(),
-        },
-        userInvitation: {
-            findFirst: vi.fn(),
-            create: vi.fn(),
-            update: vi.fn(),
-        },
-    },
+    requestPublicRegistration: vi.fn(),
 }));
 
 describe('auth Server Actions', () => {
@@ -50,7 +35,6 @@ describe('auth Server Actions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(isPublicRegistrationEnabled).mockReturnValue(true);
-        process.env.APP_URL = 'http://test.local';
     });
 
     describe('authenticate (一般ユーザーログイン)', () => {
@@ -193,17 +177,10 @@ describe('auth Server Actions', () => {
 
     describe('requestRegistrationEmailAction (自由登録確認メール送信)', () => {
         describe('正常系', () => {
-            it('未登録の有効なメールアドレスの場合にトークンを発行し、メールを送信できること', async () => {
-                vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
-                vi.mocked(prisma.userInvitation.findFirst).mockResolvedValue(null);
-                vi.mocked(prisma.userInvitation.create).mockResolvedValue({
-                    id: 'inv-1',
-                    email: 'newuser@example.com',
-                    token: 'uuid-token',
-                    expiresAt: new Date(),
-                    status: 'PENDING',
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
+            it('有効なメールアドレスの場合にサービス関数を呼び出して成功レスポンスを返すこと', async () => {
+                vi.mocked(requestPublicRegistration).mockResolvedValue({
+                    success: true,
+                    message: '確認メールを送信しました。',
                 });
 
                 const formData = new FormData();
@@ -213,43 +190,14 @@ describe('auth Server Actions', () => {
 
                 expect(result.success).toBe(true);
                 if (result.success) {
-                    expect(result.message).toContain('確認メールを送信しました');
+                    expect(result.message).toBe('確認メールを送信しました。');
                 }
-                expect(prisma.userInvitation.create).toHaveBeenCalled();
-                expect(sendEmail).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        to: 'newuser@example.com',
-                        subject: '【Template】アカウント登録のご案内',
-                    })
-                );
-            });
-
-            it('既に登録済みのユーザーの場合も列挙防止のため成功メッセージを返し、メール送信は行わないこと', async () => {
-                vi.mocked(prisma.user.findUnique).mockResolvedValue({
-                    id: 'user-1',
-                    email: 'existing@example.com',
-                    passwordHash: 'hash',
-                    name: 'User',
-                    status: 'ACTIVE',
-                    termsAgreedVersion: '1.0',
-                    termsAgreedAt: new Date(),
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                });
-
-                const formData = new FormData();
-                formData.append('email', 'existing@example.com');
-
-                const result = await requestRegistrationEmailAction(null, formData);
-
-                expect(result.success).toBe(true);
-                expect(sendEmail).not.toHaveBeenCalled();
-                expect(prisma.userInvitation.create).not.toHaveBeenCalled();
+                expect(requestPublicRegistration).toHaveBeenCalledWith('newuser@example.com');
             });
         });
 
         describe('異常系', () => {
-            it('自由登録が無効に設定されている場合はエラーを返すこと', async () => {
+            it('自由登録が無効に設定されている場合はエラーを返しサービスを呼ばないこと', async () => {
                 vi.mocked(isPublicRegistrationEnabled).mockReturnValue(false);
 
                 const formData = new FormData();
@@ -261,10 +209,10 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('現在、自由登録の受付は停止しております。');
                 }
-                expect(sendEmail).not.toHaveBeenCalled();
+                expect(requestPublicRegistration).not.toHaveBeenCalled();
             });
 
-            it('メールアドレスが無効または空の場合はエラーを返すこと', async () => {
+            it('メールアドレスが無効または空の場合はエラーを返しサービスを呼ばないこと', async () => {
                 const formData = new FormData();
                 formData.append('email', 'invalid-email');
 
@@ -274,7 +222,24 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('有効なメールアドレスを入力してください。');
                 }
-                expect(sendEmail).not.toHaveBeenCalled();
+                expect(requestPublicRegistration).not.toHaveBeenCalled();
+            });
+
+            it('サービス層で失敗した場合はそのエラーメッセージを返すこと', async () => {
+                vi.mocked(requestPublicRegistration).mockResolvedValue({
+                    success: false,
+                    error: 'メール送信に失敗しました。',
+                });
+
+                const formData = new FormData();
+                formData.append('email', 'user@example.com');
+
+                const result = await requestRegistrationEmailAction(null, formData);
+
+                expect(result.success).toBe(false);
+                if (!result.success) {
+                    expect(result.error).toBe('メール送信に失敗しました。');
+                }
             });
         });
     });
@@ -326,6 +291,7 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('登録トークンが無効または存在しません。');
                 }
+                expect(registerUserViaInvitation).not.toHaveBeenCalled();
             });
 
             it('パスワードが8文字未満の場合はエラーを返すこと', async () => {
@@ -341,6 +307,7 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('パスワードは8文字以上で入力してください。');
                 }
+                expect(registerUserViaInvitation).not.toHaveBeenCalled();
             });
 
             it('パスワードと確認用が一致しない場合はエラーを返すこと', async () => {
@@ -356,6 +323,7 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('パスワードが確認用と一致しません。');
                 }
+                expect(registerUserViaInvitation).not.toHaveBeenCalled();
             });
 
             it('利用規約に同意していない場合はエラーを返すこと', async () => {
@@ -371,12 +339,13 @@ describe('auth Server Actions', () => {
                 if (!result.success) {
                     expect(result.error).toBe('利用規約およびプライバシーポリシーへの同意が必要です。');
                 }
+                expect(registerUserViaInvitation).not.toHaveBeenCalled();
             });
 
             it('サービス層がエラーを返した場合はそのメッセージを返すこと', async () => {
                 vi.mocked(registerUserViaInvitation).mockResolvedValue({
                     success: false,
-                    message: '招待リンクの有効期限が切れています。',
+                    error: '招待リンクの有効期限が切れています。',
                 });
 
                 const formData = new FormData();

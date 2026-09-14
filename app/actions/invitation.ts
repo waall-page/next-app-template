@@ -7,6 +7,7 @@ import {
     resendInvitation,
     cancelInvitation,
 } from '@/lib/services/invitation';
+import { isInvitationEnabled } from '@/lib/env';
 import { revalidatePath } from 'next/cache';
 
 export type InvitationActionResponse =
@@ -20,6 +21,13 @@ export async function inviteUserAction(
     _prevState: unknown,
     formData: FormData
 ): Promise<InvitationActionResponse> {
+    if (!isInvitationEnabled()) {
+        return {
+            success: false,
+            error: '現在、招待機能は無効に設定されています（自由登録制で稼働中）。',
+        };
+    }
+
     const session = await auth();
 
     if (!session?.user) {
@@ -38,11 +46,11 @@ export async function inviteUserAction(
     const result = await inviteUser(email.trim());
 
     if (!result.success) {
-        return { success: false, error: result.message ?? '招待の送信に失敗しました。' };
+        return { success: false, error: result.error };
     }
 
     revalidatePath('/admin/invitations');
-    return { success: true, message: result.message ?? '招待メールを送信しました。' };
+    return { success: true, message: result.message };
 }
 
 /**
@@ -51,6 +59,13 @@ export async function inviteUserAction(
 export async function resendInvitationAction(
     invitationId: string
 ): Promise<InvitationActionResponse> {
+    if (!isInvitationEnabled()) {
+        return {
+            success: false,
+            error: '現在、招待機能は無効に設定されています。',
+        };
+    }
+
     const session = await auth();
 
     if (!session?.user || session.user.role !== 'admin') {
@@ -60,11 +75,11 @@ export async function resendInvitationAction(
     const result = await resendInvitation(invitationId);
 
     if (!result.success) {
-        return { success: false, error: result.message ?? '招待の再送信に失敗しました。' };
+        return { success: false, error: result.error };
     }
 
     revalidatePath('/admin/invitations');
-    return { success: true, message: result.message ?? '招待メールを再送信しました。' };
+    return { success: true, message: result.message };
 }
 
 /**
@@ -82,11 +97,11 @@ export async function cancelInvitationAction(
     const result = await cancelInvitation(invitationId);
 
     if (!result.success) {
-        return { success: false, error: result.message ?? '招待の取り消しに失敗しました。' };
+        return { success: false, error: result.error };
     }
 
     revalidatePath('/admin/invitations');
-    return { success: true, message: result.message ?? '招待を取り消しました。' };
+    return { success: true, message: result.message };
 }
 
 export interface InvitationItem {
