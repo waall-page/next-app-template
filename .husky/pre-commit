@@ -1,5 +1,3 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
 # 1. コミットするファイルに対してLinter（コード規約チェック）を実行
 npx lint-staged

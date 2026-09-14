@@ -32,9 +32,8 @@ test.describe('Authentication Flows', () => {
         await page.click('button:has-text("ログイン")');
 
         // エラーメッセージが表示されていることを確認
-        const errorMessage = page.locator('p.text-red-500');
+        const errorMessage = page.getByText('メールアドレスまたはパスワードが正しくありません。');
         await expect(errorMessage).toBeVisible();
-        await expect(errorMessage).toContainText('メールアドレスまたはパスワードが正しくありません。');
     });
 
     test('管理者ユーザーが正しい情報でログインし、管理ダッシュボードに遷移できること', async ({ page }) => {
@@ -43,7 +42,7 @@ test.describe('Authentication Flows', () => {
         await page.fill('input[name="email"]', 'admin@example.com');
         await page.fill('input[name="password"]', 'Template2026!');
 
-        await page.click('button:has-text("Login")');
+        await page.click('button:has-text("サインイン"), button:has-text("Login")');
 
         // 管理者ダッシュボード遷移を確認 (/admin)
         await expect(page).toHaveURL(/\/admin/);
@@ -69,8 +68,8 @@ test.describe('Authentication Flows', () => {
         // ログアウトを実行
         await logoutButton.click();
 
-        // ログイン画面へリダイレクトされることを確認
-        await expect(page).toHaveURL(/\/login/);
+        // トップ画面へリダイレクトされることを確認（userSignOut の仕様）
+        await expect(page).toHaveURL('/');
 
         // ダッシュボードに再アクセスしても、未ログインなので /login に弾かれることを確認
         await page.goto('/dashboard');

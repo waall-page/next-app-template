@@ -25,7 +25,7 @@ export default function LoginPage() {
                 </div>
 
                 {state.error && (
-                    <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
+                    <div role="alert" className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
                         <span className="font-bold">⚠️</span>
                         <span>{state.error}</span>
                     </div>
