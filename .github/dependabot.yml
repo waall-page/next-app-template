@@ -18,6 +18,9 @@ updates:
       # 開発用依存パッケージのまとめ
       development-dependencies:
         dependency-type: "development"
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">= 7.0.0"]
 
   # 2. GitHub Actions ワークフローの自動更新
   - package-ecosystem: "github-actions"
