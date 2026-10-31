@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { authConfig } from '@/lib/auth.config';
 
-describe('Auth Middleware Configuration (authorized callback)', () => {
+describe('Auth Proxy Configuration (authorized callback)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
