@@ -43,16 +43,16 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.2.1",
     "eslint": "^10",
-    "eslint-config-next": "^16.4.3",
+    "eslint-config-next": "^16.4.5",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prisma": "^7.10.1",
@@ -60,7 +60,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "allowScripts": {
     "fsevents@2.3.2": true,
